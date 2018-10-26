@@ -1,16 +1,16 @@
-# QuadView (python)
+# QuadView2 (python)
 
 ## Purpose
-Display up to usb 4 cameras side-by side in realtime
+Display up to usb 4 cameras side-by side in realtime, 
+and make simple screenshots.
 
 ## Current Status
-pre-alpha everything really hardcoded 
+alpha
 
 ## libraries used
-- pyforms (pip install PyForms)
-- opencv (is installed with the above)
-- pyqt5 (if onl linux need to use your package manager, e.g sudo apt-get install python3-pyqt5)
+- tkinter
+- opencv-python
 
 # Startup
-python quadview.py+
+python quadview2.py
 
