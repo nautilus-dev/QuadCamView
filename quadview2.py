@@ -6,47 +6,11 @@ import time
 import math
 import numpy as np
 import sys
+from Stream import Stream
+from CountsPerSec import CountsPerSec
+
 # adapated 20181026 from: https://solarianprogrammer.com/2018/04/21/python-opencv-show-video-tkinter-window/
 
-
-class Stream:
-    def __init__(self, source_id, col, row, width, height, black=False):
-        self.source_id = source_id
-        self.col = col
-        self.row = row
-        self.width = width
-        self.height = height
-        self.frame = None
-        self.black = black
-
-    def initvideo(self):
-        if not self.black:
-            self.vid = MyVideoCapture(self.source_id)
-
-    def set_heigh_width(self, width, height):
-        self.height = height
-        self.width = width
-
-    def set_black(self):
-        self.black = True
-
-    def getheight(self):
-        return self.height
-
-    def getwidth(self):
-        return self.width
-
-    def black_pic(self):
-        return np.asarray(np.zeros([self.height, self.width, 3], dtype=np.uint8))
-
-    def getframe(self):
-        if self.black:
-            return (True, self.black_pic())
-        return self.vid.get_frame(self.width, self.height)
-
-    def setcanvas(self, window):
-        self.canvas = tkinter.Canvas(window, width=self.width, height=self.height)
-        self.canvas.grid(column=self.col, row=self.row)
 
 class App:
     def __init__(self, window, window_title, num_streams):
@@ -66,8 +30,8 @@ class App:
         self.window.attributes('-fullscreen', True)
         self.window.configure(background="black")
 
-        self._stream_width = self.window.winfo_screenwidth()
-        self._stream_height = self.window.winfo_screenheight()
+        self._stream_width = self._min_stream_width
+        self._stream_height = self._min_stream_height
 
         Grid.rowconfigure(self.window, 0, weight=1)
         Grid.columnconfigure(self.window, 0, weight=1)
@@ -108,6 +72,7 @@ class App:
             if x not in self._cams:
                 black = True
             stream = Stream(source_id=x, col=x % self._numcols, row=math.floor(x / self._numcols),
+                            # width=self._stream_width, height=self._stream_height, black=black)
                             width=self._stream_width, height=self._stream_height, black=black)
             stream.initvideo()
             # Grid.columnconfigure(self.video_area, x % self._numcols, weight=1)
@@ -126,10 +91,12 @@ class App:
         Grid.rowconfigure(self.button_frame, 0, weight=1)
         self.btn_exit.grid(row=0, column=1, sticky='nswe')
 
-        # After it is called once, the update method will be automatically called every delay milliseconds
-        self.delay = 15
-        self.update()
+        self.cps = CountsPerSec().start()
 
+        self.delay = 5
+        self.stopped = False
+        # After it is called once, the update method will be automatically called every delay milliseconds
+        self.update()
         self.window.mainloop()
 
     def calculate_size(self):
@@ -148,6 +115,8 @@ class App:
 
         self._stream_width = x_dim if x_dim > self._min_stream_width else self._min_stream_width
         self._stream_height = y_dim if y_dim > self._min_stream_height else self._min_stream_height
+
+        print("Set the playback size to: " + str(self._stream_width) + "x" + str(self._stream_height))
 
     def accessible_device(self, source):
         cap = cv2.VideoCapture(source)
@@ -173,42 +142,24 @@ class App:
         for stream in self.streams:
             ret, frame = stream.getframe()
             if ret:
+                frame = self.putIterationsPerSec(frame, self.cps.countsPerSec())
                 stream.photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(frame))
                 stream.canvas.create_image(0, 0, image=stream.photo, anchor=tkinter.NW)
         self.window.after(self.delay, self.update)
+        self.cps.increment()
+
+    def putIterationsPerSec(self, frame, iterations_per_sec):
+        """
+        Add iterations per second text to lower-left corner of a frame.
+        """
+
+        cv2.putText(frame, "{:.0f} iterations/sec".format(iterations_per_sec),
+                    (200, 200), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 0, 0))
+        return frame
 
     def quit(self):
         sys.exit(0)
 
-class MyVideoCapture:
-    def __init__(self, video_source=1):
-        # Open the video source
-        self.vid = cv2.VideoCapture(video_source)
-        if not self.vid.isOpened():
-            raise ValueError("Unable to open video source", video_source)
-
-        # Get video source width and height
-        self.ip_width = self.vid.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self.ip_height = self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT)
-
-    def get_frame(self, pb_width, pb_height):
-        if self.vid.isOpened():
-            ret, frame = self.vid.read()
-            r = pb_width / float(self.ip_width)
-            dim = (pb_width, int(self.ip_height * r))
-            frame_resized = cv2.resize(frame, dim)
-            if ret:
-                # Return a boolean success flag and the current frame converted to BGR
-                return (ret, cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB))
-            else:
-                return (ret, None)
-        else:
-            return (ret, None)
-
-    # Release the video source when the object is destroyed
-    def __del__(self):
-        if self.vid.isOpened():
-            self.vid.release()
 
 # Create a window and pass it to the Application object
 App(tkinter.Tk(), "QuadCameraView", num_streams=4)

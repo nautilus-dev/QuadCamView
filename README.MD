@@ -10,7 +10,7 @@ alpha
 ## libraries used
 - tkinter
 - opencv-python
-
+- Pillow
 
 # Startup
 python quadview2.py
